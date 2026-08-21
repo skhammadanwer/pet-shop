@@ -5,37 +5,41 @@ import "truffle/DeployedAddresses.sol";
 import "../contracts/Adoption.sol";
 
 contract TestAdoption {
-// The address of the adoption contract to be tested
- Adoption adoption = Adoption(DeployedAddresses.Adoption());
+  Adoption adoption = Adoption(DeployedAddresses.Adoption());
 
-// The id of the pet that will be used for testing
- uint expectedPetId = 8;
+  uint expectedPetId = 8;
+  address expectedAdopter = address(this);
+  address expectedNewOwner = address(0x123);
 
-//The expected owner of adopted pet is this contract
- address expectedAdopter = address(this);
+  function testUserCanAdoptPet() public {
+    uint returnedId = adoption.adopt(expectedPetId);
+    Assert.equal(returnedId, expectedPetId, "Adoption of the expected pet should match what is returned.");
+  }
 
-// Testing the adopt() function
-function testUserCanAdoptPet() public {
-  uint returnedId = adoption.adopt(expectedPetId);
+  function testGetAdopterAddressByPetId() public {
+    address adopter = adoption.adopters(expectedPetId);
+    Assert.equal(adopter, expectedAdopter, "Owner of the expected pet should be this contract");
+  }
 
-  Assert.equal(returnedId, expectedPetId, "Adoption of the expected pet should match what is returned.");
+  function testGetAdopterAddressByPetIdInArray() public {
+    address[16] memory adopters = adoption.getAdopters();
+    Assert.equal(adopters[expectedPetId], expectedAdopter, "Owner of the expected pet should be this contract");
+  }
+
+  function testOwnerCanTransferPet() public {
+    adoption.transfer(expectedPetId, expectedNewOwner);
+    address adopter = adoption.adopters(expectedPetId);
+    Assert.equal(adopter, expectedNewOwner, "Owner of the pet should be the transfer recipient");
+  }
+
+  function testHistoryRecordsAdoptAndTransfer() public {
+    address[] memory owners;
+    uint[] memory timestamps;
+    (owners, timestamps) = adoption.getHistory(expectedPetId);
+
+    Assert.equal(owners.length, 2, "History should include adopt and transfer");
+    Assert.equal(timestamps.length, 2, "History should include two timestamps");
+    Assert.equal(owners[0], expectedAdopter, "First owner should be this contract");
+    Assert.equal(owners[1], expectedNewOwner, "Second owner should be the transfer recipient");
+  }
 }
-
-// Testing retrieval of a single pet's owner
-function testGetAdopterAddressByPetId() public {
-  address adopter = adoption.adopters(expectedPetId);
-
-  Assert.equal(adopter, expectedAdopter, "Owner of the expected pet should be this contract");
-}
-
-// Testing retrieval of all pet owners
-function testGetAdopterAddressByPetIdInArray() public {
-  // Store adopters in memory rather than contract's storage
-  address[16] memory adopters = adoption.getAdopters();
-
-  Assert.equal(adopters[expectedPetId], expectedAdopter, "Owner of the expected pet should be this contract");
-}
-
-
-}
-
