@@ -1,26 +1,45 @@
 App = {
   web3Provider: null,
   contracts: {},
+  pets: [],
+  selectedBreed: 'all',
 
   init: async function() {
     // Load pets from pets.json and render cards
     $.getJSON('../pets.json', function(data) {
-      var petsRow = $('#petsRow');
-      var petTemplate = $('#petTemplate');
-
-      for (var i = 0; i < data.length; i++) {
-        petTemplate.find('.panel-title').text(data[i].name);
-        petTemplate.find('img').attr('src', data[i].picture);
-        petTemplate.find('.pet-breed').text(data[i].breed);
-        petTemplate.find('.pet-age').text(data[i].age);
-        petTemplate.find('.pet-location').text(data[i].location);
-        petTemplate.find('.btn-adopt').attr('data-id', data[i].id);
-
-        petsRow.append(petTemplate.html());
-      }
+      App.pets = data;
+      App.renderPets();
     });
 
     return await App.initWeb3();
+  },
+
+  renderPets: function() {
+    var petsRow = $('#petsRow');
+    var petTemplate = $('#petTemplate');
+    petsRow.empty();
+
+    var filtered = App.pets.filter(function(pet) {
+      return App.selectedBreed === 'all' || pet.breed === App.selectedBreed;
+    });
+
+    for (var i = 0; i < filtered.length; i++) {
+      petTemplate.find('.panel-title').text(filtered[i].name);
+      petTemplate.find('img').attr('src', filtered[i].picture);
+      petTemplate.find('.pet-breed').text(filtered[i].breed);
+      petTemplate.find('.pet-age').text(filtered[i].age);
+      petTemplate.find('.pet-location').text(filtered[i].location);
+      petTemplate.find('.btn-adopt').attr('data-id', filtered[i].id);
+
+      petsRow.append(petTemplate.html());
+    }
+
+    var countLabel = filtered.length === 1
+      ? 'Showing 1 pet'
+      : 'Showing ' + filtered.length + ' pets';
+    $('#filterCount').text(countLabel);
+
+    App.markAdopted();
   },
 
   initWeb3: async function() {
@@ -88,10 +107,31 @@ App = {
   bindEvents: function() {
     $(document).on('click', '.btn-adopt', App.handleAdopt);
     $(document).on('click', '#connectButton', App.connectWallet);
+    $(document).on('click', '.btn-breed-filter', App.handleBreedFilter);
+  },
+
+  handleBreedFilter: function(event) {
+    event.preventDefault();
+
+    App.selectedBreed = $(event.target).attr('data-breed');
+
+    $('.btn-breed-filter')
+      .removeClass('btn-primary')
+      .addClass('btn-default');
+    $(event.target)
+      .removeClass('btn-default')
+      .addClass('btn-primary');
+
+    App.renderPets();
   },
 
   markAdopted: function(adopters, account) {
+    if (!App.contracts.Adoption) {
+      return;
+    }
+
     var adoptionInstance;
+    var emptyAddress = '0x0000000000000000000000000000000000000000';
 
     App.contracts.Adoption.deployed()
       .then(function(instance) {
@@ -99,11 +139,12 @@ App = {
         return adoptionInstance.getAdopters.call();
       })
       .then(function(adopters) {
-        for (var i = 0; i < adopters.length; i++) {
-          if (adopters[i] !== '0x0000000000000000000000000000000000000000') {
-            $('.panel-pet').eq(i).find('button').text('Success').attr('disabled', true);
+        $('.btn-adopt').each(function() {
+          var petId = parseInt($(this).attr('data-id'), 10);
+          if (adopters[petId] && adopters[petId] !== emptyAddress) {
+            $(this).text('Success').attr('disabled', true);
           }
-        }
+        });
       })
       .catch(function(err) {
         console.log(err.message);
