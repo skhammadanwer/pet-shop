@@ -56,6 +56,51 @@
             <strong>Age</strong>: <span class="pet-age">3</span><br/>
             <strong>Location</strong>: <span class="pet-location">Warren, MI</span><br/><br/>
             <button class="btn btn-default btn-adopt" type="button" data-id="0">Adopt</button>
+            <hr>
+            <h4>Vaccination Record</h4>
+            <button
+              class="btn btn-info btn-view-vaccinations"
+              type="button"
+              data-id="0">
+              View Records
+            </button>
+            <!-- Add style="display: none;" below data-id="0" when finish all the code  -->
+            <button
+              class="btn btn-success btn-add-vaccination"
+              type="button"
+              data-id="0"
+              >
+              + Add Vaccination
+            </button>
+            <br><br>
+            <div class="vaccination-form" style="display: none;">
+              <input
+                type="text"
+                class="form-control vaccine-name"
+                placeholder="Vaccine Name">
+              <br>
+              <input
+                type="date"
+                class="form-control vaccine-date">
+              <br>
+              <input
+                type="text"
+                class="form-control clinic-name"
+                placeholder="Clinic Name">
+              <br>
+              <button
+                class="btn btn-primary btn-save-vaccination"
+                type="button"
+                data-id="0">
+                Save Vaccination
+              </button>
+              <br><br>
+            </div>
+            <div
+              class="vaccination-message"
+              style="display: none;">
+            </div>
+            <div class="vaccination-history"></div>
           </div>
         </div>
       </div>
