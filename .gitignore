@@ -1,0 +1,5 @@
+﻿node_modules/
+build/
+custom-solc-0.5.16/
+custom-solc-0.5.16/
+*.bak
