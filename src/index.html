@@ -38,6 +38,19 @@
         </div>
       </div>
 
+      <div class="row">
+        <div class="col-xs-12 text-center">
+          <p><strong>Filter by breed</strong></p>
+          <button type="button" class="btn btn-primary btn-breed-filter" data-breed="all" style="margin: 0 4px 8px;">All (16)</button>
+          <button type="button" class="btn btn-default btn-breed-filter" data-breed="Scottish Terrier" style="margin: 0 4px 8px;">Scottish Terrier (3)</button>
+          <button type="button" class="btn btn-default btn-breed-filter" data-breed="French Bulldog" style="margin: 0 4px 8px;">French Bulldog (5)</button>
+          <button type="button" class="btn btn-default btn-breed-filter" data-breed="Boxer" style="margin: 0 4px 8px;">Boxer (3)</button>
+          <button type="button" class="btn btn-default btn-breed-filter" data-breed="Golden Retriever" style="margin: 0 4px 8px;">Golden Retriever (5)</button>
+          <p id="filterCount" class="text-muted" style="margin-top: 10px;">Showing 16 pets</p>
+          <br/>
+        </div>
+      </div>
+
       <div id="petsRow" class="row">
         <!-- PETS LOAD HERE -->
       </div>
@@ -54,7 +67,17 @@
             <br/><br/>
             <strong>Breed</strong>: <span class="pet-breed">Golden Retriever</span><br/>
             <strong>Age</strong>: <span class="pet-age">3</span><br/>
-            <strong>Location</strong>: <span class="pet-location">Warren, MI</span><br/><br/>
+            <strong>Location</strong>: <span class="pet-location">Warren, MI</span><br/>
+            <strong>Owner</strong>: <span class="pet-owner">Available</span><br/>
+            <strong>History</strong>:
+            <ul class="pet-history list-unstyled" style="margin-top: 6px; font-size: 12px;">
+              <li class="text-muted">None yet</li>
+            </ul>
+            <div class="form-group transfer-form" style="margin-top: 8px; margin-bottom: 8px;">
+              <input type="text" class="form-control input-sm pet-transfer-address" placeholder="New owner address">
+              <button class="btn btn-default btn-sm btn-transfer" type="button" data-id="0" style="margin-top: 6px;">Transfer</button>
+              <p class="text-danger pet-transfer-error" style="margin-top: 6px; display: none;"></p>
+            </div>
             <button class="btn btn-default btn-adopt" type="button" data-id="0">Adopt</button>
           </div>
         </div>

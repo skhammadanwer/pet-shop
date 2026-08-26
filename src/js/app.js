@@ -1,26 +1,71 @@
 App = {
   web3Provider: null,
   contracts: {},
+  pets: [],
+  selectedBreed: 'all',
+  emptyAddress: '0x0000000000000000000000000000000000000000',
 
   init: async function() {
     // Load pets from pets.json and render cards
     $.getJSON('../pets.json', function(data) {
-      var petsRow = $('#petsRow');
-      var petTemplate = $('#petTemplate');
-
-      for (var i = 0; i < data.length; i++) {
-        petTemplate.find('.panel-title').text(data[i].name);
-        petTemplate.find('img').attr('src', data[i].picture);
-        petTemplate.find('.pet-breed').text(data[i].breed);
-        petTemplate.find('.pet-age').text(data[i].age);
-        petTemplate.find('.pet-location').text(data[i].location);
-        petTemplate.find('.btn-adopt').attr('data-id', data[i].id);
-
-        petsRow.append(petTemplate.html());
-      }
+      App.pets = data;
+      App.renderPets();
     });
 
     return await App.initWeb3();
+  },
+
+  truncateAddress: function(address) {
+    if (!address || address === App.emptyAddress) {
+      return 'Available';
+    }
+    return address.slice(0, 6) + '...' + address.slice(-4);
+  },
+
+  isAddress: function(value) {
+    if (!value) {
+      return false;
+    }
+    if (web3.utils && web3.utils.isAddress) {
+      return web3.utils.isAddress(value);
+    }
+    if (web3.isAddress) {
+      return web3.isAddress(value);
+    }
+    return /^0x[0-9a-fA-F]{40}$/.test(value);
+  },
+
+  renderPets: function() {
+    var petsRow = $('#petsRow');
+    var petTemplate = $('#petTemplate');
+    petsRow.empty();
+
+    var filtered = App.pets.filter(function(pet) {
+      return App.selectedBreed === 'all' || pet.breed === App.selectedBreed;
+    });
+
+    for (var i = 0; i < filtered.length; i++) {
+      petTemplate.find('.panel-title').text(filtered[i].name);
+      petTemplate.find('img').attr('src', filtered[i].picture);
+      petTemplate.find('.pet-breed').text(filtered[i].breed);
+      petTemplate.find('.pet-age').text(filtered[i].age);
+      petTemplate.find('.pet-location').text(filtered[i].location);
+      petTemplate.find('.pet-owner').text('Available');
+      petTemplate.find('.pet-history').html('<li class="text-muted">None yet</li>');
+      petTemplate.find('.pet-transfer-address').val('');
+      petTemplate.find('.pet-transfer-error').hide().text('');
+      petTemplate.find('.btn-adopt').attr('data-id', filtered[i].id).text('Adopt').attr('disabled', false);
+      petTemplate.find('.btn-transfer').attr('data-id', filtered[i].id);
+
+      petsRow.append(petTemplate.html());
+    }
+
+    var countLabel = filtered.length === 1
+      ? 'Showing 1 pet'
+      : 'Showing ' + filtered.length + ' pets';
+    $('#filterCount').text(countLabel);
+
+    App.markAdopted();
   },
 
   initWeb3: async function() {
@@ -87,10 +132,63 @@ App = {
 
   bindEvents: function() {
     $(document).on('click', '.btn-adopt', App.handleAdopt);
+    $(document).on('click', '.btn-transfer', App.handleTransfer);
     $(document).on('click', '#connectButton', App.connectWallet);
+    $(document).on('click', '.btn-breed-filter', App.handleBreedFilter);
+  },
+
+  handleBreedFilter: function(event) {
+    event.preventDefault();
+
+    App.selectedBreed = $(event.target).attr('data-breed');
+
+    $('.btn-breed-filter')
+      .removeClass('btn-primary')
+      .addClass('btn-default');
+    $(event.target)
+      .removeClass('btn-default')
+      .addClass('btn-primary');
+
+    App.renderPets();
+  },
+
+  showPanelError: function($panel, message) {
+    $panel.find('.pet-transfer-error').text(message).show();
+  },
+
+  loadHistory: function(adoptionInstance, $panel, petId) {
+    return adoptionInstance.getHistory.call(petId)
+      .then(function(result) {
+        var owners = result[0];
+        var timestamps = result[1];
+        var $list = $panel.find('.pet-history');
+        $list.empty();
+
+        if (!owners || owners.length === 0) {
+          $list.append('<li class="text-muted">None yet</li>');
+          return;
+        }
+
+        for (var i = 0; i < owners.length; i++) {
+          var ts = timestamps[i];
+          if (ts && typeof ts.toNumber === 'function') {
+            ts = ts.toNumber();
+          } else {
+            ts = Number(ts);
+          }
+          var when = isNaN(ts) ? '' : new Date(ts * 1000).toLocaleString();
+          $list.append(
+            '<li>' + App.truncateAddress(owners[i]) + (when ? ' · ' + when : '') + '</li>'
+          );
+        }
+      });
   },
 
   markAdopted: function(adopters, account) {
+    if (!App.contracts.Adoption) {
+      return;
+    }
+
     var adoptionInstance;
 
     App.contracts.Adoption.deployed()
@@ -99,11 +197,24 @@ App = {
         return adoptionInstance.getAdopters.call();
       })
       .then(function(adopters) {
-        for (var i = 0; i < adopters.length; i++) {
-          if (adopters[i] !== '0x0000000000000000000000000000000000000000') {
-            $('.panel-pet').eq(i).find('button').text('Success').attr('disabled', true);
+        $('.panel-pet').each(function() {
+          var $panel = $(this);
+          var petId = parseInt($panel.find('.btn-adopt').attr('data-id'), 10);
+          var owner = adopters[petId];
+          var isOwned = owner && owner !== App.emptyAddress;
+
+          $panel.find('.pet-owner').text(
+            isOwned ? App.truncateAddress(owner) : 'Available'
+          );
+
+          if (isOwned) {
+            $panel.find('.btn-adopt').text('Success').attr('disabled', true);
+          } else {
+            $panel.find('.btn-adopt').text('Adopt').attr('disabled', false);
           }
-        }
+
+          App.loadHistory(adoptionInstance, $panel, petId);
+        });
       })
       .catch(function(err) {
         console.log(err.message);
@@ -113,17 +224,21 @@ App = {
   handleAdopt: function(event) {
     event.preventDefault();
 
-    var petId = parseInt($(event.target).data('id'));
+    var $btn = $(event.target);
+    var $panel = $btn.closest('.panel-pet');
+    var petId = parseInt($btn.attr('data-id'), 10);
     var adoptionInstance;
+
+    $panel.find('.pet-transfer-error').hide().text('');
 
     web3.eth.getAccounts(function(error, accounts) {
       if (error) {
-        console.log(error);
+        App.showPanelError($panel, error.message || 'Could not read wallet accounts.');
         return;
       }
 
       if (!accounts || accounts.length === 0) {
-        console.log('No accounts available. Make sure MetaMask is connected.');
+        App.showPanelError($panel, 'No accounts available. Make sure MetaMask is connected.');
         return;
       }
 
@@ -132,15 +247,58 @@ App = {
       App.contracts.Adoption.deployed()
         .then(function(instance) {
           adoptionInstance = instance;
-
-          // Execute adopt as a transaction by sending from the selected account
           return adoptionInstance.adopt(petId, { from: account });
         })
         .then(function(result) {
           return App.markAdopted();
         })
         .catch(function(err) {
-          console.log(err.message);
+          App.showPanelError($panel, err.message || 'Adoption failed.');
+        });
+    });
+  },
+
+  handleTransfer: function(event) {
+    event.preventDefault();
+
+    var $btn = $(event.target);
+    var $panel = $btn.closest('.panel-pet');
+    var petId = parseInt($btn.attr('data-id'), 10);
+    var newOwner = ($panel.find('.pet-transfer-address').val() || '').trim();
+    var $err = $panel.find('.pet-transfer-error');
+    $err.hide().text('');
+
+    if (!App.isAddress(newOwner)) {
+      App.showPanelError($panel, 'Enter a valid wallet address.');
+      return;
+    }
+
+    web3.eth.getAccounts(function(error, accounts) {
+      if (error) {
+        App.showPanelError($panel, error.message || 'Could not read wallet accounts.');
+        return;
+      }
+
+      if (!accounts || accounts.length === 0) {
+        App.showPanelError($panel, 'No accounts available. Make sure MetaMask is connected.');
+        return;
+      }
+
+      var account = accounts[0];
+
+      App.contracts.Adoption.deployed()
+        .then(function(instance) {
+          return instance.transfer(petId, newOwner, { from: account });
+        })
+        .then(function(result) {
+          $panel.find('.pet-transfer-address').val('');
+          return App.markAdopted();
+        })
+        .catch(function(err) {
+          App.showPanelError(
+            $panel,
+            err.message || 'Transfer failed. Only the current owner can transfer this pet.'
+          );
         });
     });
   }
