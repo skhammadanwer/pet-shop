@@ -14,6 +14,7 @@ contract Adoption {
 
   address[16] public adopters;
   uint public petCount = 16;
+  uint public returnFee = 0.01 ether;
 
   mapping(uint => address[]) private historyOwners;
   mapping(uint => uint[]) private historyTimes;
@@ -51,6 +52,21 @@ contract Adoption {
     historyTimes[petId].push(now);
 
     emit Transferred(petId, previous, newOwner, now);
+  }
+
+  function returnPet(uint petId) public payable {
+    require(petId < petCount, "Invalid pet ID");
+    require(adopters[petId] == msg.sender, "You are not the adopter");
+    require(msg.value == returnFee, "Incorrect return fee");
+
+    address previous = adopters[petId];
+    adopters[petId] = address(0);
+    historyOwners[petId].push(address(0));
+    historyTimes[petId].push(now);
+
+    emit Transferred(petId, previous, address(0), now);
+
+    address(uint160(admin)).transfer(msg.value);
   }
 
   function getAdopters() public view returns (address[16] memory) {
