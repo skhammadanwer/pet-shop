@@ -3,6 +3,10 @@ App = {
   contracts: {},
   pets: [],
   selectedBreed: 'all',
+  selectedStatus: 'all',
+  showMyPetsOnly: false,
+  adopters: null,
+  currentAccount: null,
   emptyAddress: '0x0000000000000000000000000000000000000000',
 
   init: async function() {
@@ -14,9 +18,9 @@ App = {
     return await App.initWeb3();
   },
 
-  truncateAddress: function(address) {
+  truncateAddress: function(address, emptyLabel) {
     if (!address || address === App.emptyAddress) {
-      return 'Available';
+      return emptyLabel || 'Available';
     }
     return address.slice(0, 6) + '...' + address.slice(-4);
   },
@@ -35,13 +39,80 @@ App = {
   },
 
   renderPets: function() {
+    if (!App.contracts.Adoption) {
+      App.drawPetCards(App.pets.filter(function(pet) {
+        return App.selectedBreed === 'all' || pet.breed === App.selectedBreed;
+      }));
+      return;
+    }
+
+    App.contracts.Adoption.deployed()
+      .then(function(instance) {
+        return instance.getAdopters.call();
+      })
+      .then(function(adopters) {
+        App.adopters = adopters;
+        return App.resolveCurrentAccount();
+      })
+      .then(function() {
+        App.drawPetCards(App.getFilteredPets());
+      })
+      .catch(function(err) {
+        console.log(err.message);
+      });
+  },
+
+  resolveCurrentAccount: function() {
+    return new Promise(function(resolve) {
+      web3.eth.getAccounts(function(error, accounts) {
+        App.currentAccount = null;
+        if (!error && accounts && accounts.length > 0) {
+          App.currentAccount = accounts[0].toLowerCase();
+        }
+        App.updateMyPetsToggle();
+        resolve();
+      });
+    });
+  },
+
+  getFilteredPets: function() {
+    var adopters = App.adopters;
+
+    return App.pets.filter(function(pet) {
+      if (App.selectedBreed !== 'all' && pet.breed !== App.selectedBreed) {
+        return false;
+      }
+
+      if (adopters) {
+        var owner = adopters[pet.id];
+        var isOwned = owner && owner !== App.emptyAddress;
+
+        if (App.selectedStatus === 'available' && isOwned) {
+          return false;
+        }
+
+        if (App.selectedStatus === 'adopted' && !isOwned) {
+          return false;
+        }
+
+        if (App.showMyPetsOnly) {
+          if (!App.currentAccount) {
+            return false;
+          }
+          if (!isOwned || owner.toLowerCase() !== App.currentAccount) {
+            return false;
+          }
+        }
+      }
+
+      return true;
+    });
+  },
+
+  drawPetCards: function(filtered) {
     var petsRow = $('#petsRow');
     var petTemplate = $('#petTemplate');
     petsRow.empty();
-
-    var filtered = App.pets.filter(function(pet) {
-      return App.selectedBreed === 'all' || pet.breed === App.selectedBreed;
-    });
 
     for (var i = 0; i < filtered.length; i++) {
       petTemplate.find('.panel-title').text(filtered[i].name);
@@ -65,12 +136,39 @@ App = {
       petsRow.append(petTemplate.html());
     }
 
+    if (filtered.length === 0) {
+      var emptyMessage = 'No pets match these filters.';
+      if (App.showMyPetsOnly && !App.currentAccount) {
+        emptyMessage = 'Connect your wallet to see your pets.';
+      }
+      petsRow.append(
+        '<div class="col-xs-12 text-center"><p class="text-muted">' + emptyMessage + '</p></div>'
+      );
+    }
+
     var countLabel = filtered.length === 1
       ? 'Showing 1 pet'
       : 'Showing ' + filtered.length + ' pets';
     $('#filterCount').text(countLabel);
 
     App.markAdopted();
+  },
+
+  updateMyPetsToggle: function() {
+    var $toggle = $('#myPetsToggle');
+    var $hint = $('#myPetsHint');
+
+    if (App.showMyPetsOnly) {
+      $toggle.removeClass('btn-default').addClass('btn-primary').text('My pets only (on)');
+    } else {
+      $toggle.removeClass('btn-primary').addClass('btn-default').text('My pets only');
+    }
+
+    if (App.showMyPetsOnly && !App.currentAccount) {
+      $hint.show();
+    } else {
+      $hint.hide();
+    }
   },
 
   initWeb3: async function() {
@@ -109,6 +207,7 @@ App = {
       }
 
       await App.checkAdmin(accounts[0]);
+      App.renderPets();
     } catch (error) {
       console.error('Error requesting accounts:', error);
     }
@@ -134,7 +233,7 @@ App = {
       var AdoptionArtifact = data;
       App.contracts.Adoption = TruffleContract(AdoptionArtifact);
       App.contracts.Adoption.setProvider(App.web3Provider);
-      return App.markAdopted();
+      return App.renderPets();
     });
 
     return App.bindEvents();
@@ -145,6 +244,8 @@ App = {
     $(document).on('click', '.btn-transfer', App.handleTransfer);
     $(document).on('click', '#connectButton', App.connectWallet);
     $(document).on('click', '.btn-breed-filter', App.handleBreedFilter);
+    $(document).on('click', '.btn-status-filter', App.handleStatusFilter);
+    $(document).on('click', '#myPetsToggle', App.handleMyPetsToggle);
     $(document).on('click', '.btn-view-vaccinations', App.handleViewVaccinations);
     $(document).on('click', '.btn-add-vaccination', App.handleShowVaccinationForm);
     $(document).on('click', '.btn-save-vaccination', App.handleSaveVaccination);
@@ -162,6 +263,28 @@ App = {
       .removeClass('btn-default')
       .addClass('btn-primary');
 
+    App.renderPets();
+  },
+
+  handleStatusFilter: function(event) {
+    event.preventDefault();
+
+    App.selectedStatus = $(event.target).attr('data-status');
+
+    $('.btn-status-filter')
+      .removeClass('btn-primary')
+      .addClass('btn-default');
+    $(event.target)
+      .removeClass('btn-default')
+      .addClass('btn-primary');
+
+    App.renderPets();
+  },
+
+  handleMyPetsToggle: function(event) {
+    event.preventDefault();
+
+    App.showMyPetsOnly = !App.showMyPetsOnly;
     App.renderPets();
   },
 
@@ -191,7 +314,7 @@ App = {
           }
           var when = isNaN(ts) ? '' : new Date(ts * 1000).toLocaleString();
           $list.append(
-            '<li>' + App.truncateAddress(owners[i]) + (when ? ' · ' + when : '') + '</li>'
+            '<li>' + App.truncateAddress(owners[i], 'Returned') + (when ? ' · ' + when : '') + '</li>'
           );
         }
       });
@@ -210,6 +333,8 @@ App = {
         return adoptionInstance.getAdopters.call();
       })
       .then(function(adopters) {
+        App.adopters = adopters;
+
         $('.panel-pet').each(function() {
           var $panel = $(this);
           var petId = parseInt($panel.find('.btn-adopt').attr('data-id'), 10);
@@ -261,7 +386,7 @@ App = {
           return instance.adopt(petId, { from: account });
         })
         .then(function(result) {
-          return App.markAdopted();
+          return App.renderPets();
         })
         .catch(function(err) {
           App.showPanelError($panel, err.message || 'Adoption failed.');
@@ -303,7 +428,7 @@ App = {
         })
         .then(function(result) {
           $panel.find('.pet-transfer-address').val('');
-          return App.markAdopted();
+          return App.renderPets();
         })
         .catch(function(err) {
           App.showPanelError(
