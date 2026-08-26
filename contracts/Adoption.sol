@@ -2,51 +2,66 @@ pragma solidity ^0.5.0;
 
 contract Adoption {
   address public admin;
+
   constructor() public {
     admin = msg.sender;
   }
+
   modifier onlyAdmin() {
     require(msg.sender == admin, "Only admin can add vaccination records");
     _;
   }
-  // IMPORTANT！！！！！！！！！！！！！！！！！！！！！！！！
-  // When you guys doing adding pets part please alter code below.
-  address[16] public adopters;
 
-  // Current number of pets.
-  // The Add Pet feature can update this value later.
+  address[16] public adopters;
   uint public petCount = 16;
 
-  // Adopting a pet
-  function adopt(uint petId) public returns (uint) {
-    require(petId >= 0 && petId <= 15);
+  mapping(uint => address[]) private historyOwners;
+  mapping(uint => uint[]) private historyTimes;
 
-    adopters[petId] = msg.sender;
+  event Transferred(uint petId, address from, address to, uint timestamp);
 
-    return petId;
-  }
-  // Retrieving the adopters
-  function getAdopters() public view returns (address[16] memory) {
-    return adopters;
-  }
-
-  //------------------------------------------------
-  // Vaccination Record
-  //------------------------------------------------
-
-  // Vaccination Record feature
   struct VaccinationRecord {
     string vaccineName;
     string vaccinationDate;
     string clinicName;
   }
 
-  // Each pet ID can have multiple vaccination records
   mapping(uint => VaccinationRecord[]) private vaccinationRecords;
 
-  // Vaccination Record functions
-  
-  // Add a vaccination record for a pet
+  function adopt(uint petId) public returns (uint) {
+    require(petId < petCount, "Invalid pet ID");
+    require(adopters[petId] == address(0));
+
+    adopters[petId] = msg.sender;
+    historyOwners[petId].push(msg.sender);
+    historyTimes[petId].push(now);
+
+    emit Transferred(petId, address(0), msg.sender, now);
+    return petId;
+  }
+
+  function transfer(uint petId, address newOwner) public {
+    require(petId < petCount, "Invalid pet ID");
+    require(adopters[petId] == msg.sender);
+    require(newOwner != address(0));
+
+    address previous = adopters[petId];
+    adopters[petId] = newOwner;
+    historyOwners[petId].push(newOwner);
+    historyTimes[petId].push(now);
+
+    emit Transferred(petId, previous, newOwner, now);
+  }
+
+  function getAdopters() public view returns (address[16] memory) {
+    return adopters;
+  }
+
+  function getHistory(uint petId) public view returns (address[] memory, uint[] memory) {
+    require(petId < petCount, "Invalid pet ID");
+    return (historyOwners[petId], historyTimes[petId]);
+  }
+
   function addVaccinationRecord(
     uint petId,
     string memory vaccineName,
@@ -59,26 +74,23 @@ contract Adoption {
     require(petId < petCount, "Invalid pet ID");
 
     vaccinationRecords[petId].push(
-        VaccinationRecord(
-            vaccineName,
-            vaccinationDate,
-            clinicName
-        )
+      VaccinationRecord(
+        vaccineName,
+        vaccinationDate,
+        clinicName
+      )
     );
   }
 
-  // Get the number of vaccination records for one pet
   function getVaccinationCount(uint petId)
-      public
-      view
-      returns (uint)
+    public
+    view
+    returns (uint)
   {
-      require(petId < petCount, "Invalid pet ID");
-
-      return vaccinationRecords[petId].length;
+    require(petId < petCount, "Invalid pet ID");
+    return vaccinationRecords[petId].length;
   }
 
-  // Return one vaccination record
   function getVaccinationRecord(
     uint petId,
     uint recordIndex
@@ -100,9 +112,9 @@ contract Adoption {
     VaccinationRecord storage record = vaccinationRecords[petId][recordIndex];
 
     return (
-        record.vaccineName,
-        record.vaccinationDate,
-        record.clinicName
+      record.vaccineName,
+      record.vaccinationDate,
+      record.clinicName
     );
   }
 }
