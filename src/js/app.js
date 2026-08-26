@@ -6,7 +6,6 @@ App = {
   emptyAddress: '0x0000000000000000000000000000000000000000',
 
   init: async function() {
-    // Load pets from pets.json and render cards
     $.getJSON('../pets.json', function(data) {
       App.pets = data;
       App.renderPets();
@@ -56,6 +55,12 @@ App = {
       petTemplate.find('.pet-transfer-error').hide().text('');
       petTemplate.find('.btn-adopt').attr('data-id', filtered[i].id).text('Adopt').attr('disabled', false);
       petTemplate.find('.btn-transfer').attr('data-id', filtered[i].id);
+      petTemplate.find('.btn-view-vaccinations').attr('data-id', filtered[i].id).text('View Records');
+      petTemplate.find('.btn-add-vaccination').attr('data-id', filtered[i].id).text('+ Add Vaccination').hide();
+      petTemplate.find('.btn-save-vaccination').attr('data-id', filtered[i].id);
+      petTemplate.find('.vaccination-form').hide();
+      petTemplate.find('.vaccination-message').hide().text('');
+      petTemplate.find('.vaccination-history').hide().empty();
 
       petsRow.append(petTemplate.html());
     }
@@ -69,26 +74,18 @@ App = {
   },
 
   initWeb3: async function() {
-    // Modern dapp browsers
     if (window.ethereum) {
       App.web3Provider = window.ethereum;
-    }
-    // Legacy dapp browsers
-    else if (window.web3) {
+    } else if (window.web3) {
       App.web3Provider = window.web3.currentProvider;
-    }
-    // Fallback to Ganache (local)
-    else {
+    } else {
       App.web3Provider = new Web3.providers.HttpProvider('http://localhost:7545');
     }
 
-    // Initialize web3 with the provider
     web3 = new Web3(App.web3Provider);
-
     return App.initContract();
   },
 
-  // Explicit user-initiated connection to MetaMask
   connectWallet: async function() {
     if (!window.ethereum) {
       alert('MetaMask is not available in this browser.');
@@ -110,8 +107,25 @@ App = {
           '...' +
           accounts[0].slice(-4);
       }
+
+      await App.checkAdmin(accounts[0]);
     } catch (error) {
       console.error('Error requesting accounts:', error);
+    }
+  },
+
+  checkAdmin: async function(account) {
+    try {
+      var adoptionInstance = await App.contracts.Adoption.deployed();
+      var admin = await adoptionInstance.admin.call();
+
+      if (account.toLowerCase() === admin.toLowerCase()) {
+        $('.btn-add-vaccination').show();
+      } else {
+        $('.btn-add-vaccination').hide();
+      }
+    } catch (error) {
+      console.error('Error checking admin:', error);
     }
   },
 
@@ -119,11 +133,7 @@ App = {
     $.getJSON('Adoption.json', function(data) {
       var AdoptionArtifact = data;
       App.contracts.Adoption = TruffleContract(AdoptionArtifact);
-
-      // Set the provider for our contract
       App.contracts.Adoption.setProvider(App.web3Provider);
-
-      // Mark already adopted pets
       return App.markAdopted();
     });
 
@@ -135,6 +145,9 @@ App = {
     $(document).on('click', '.btn-transfer', App.handleTransfer);
     $(document).on('click', '#connectButton', App.connectWallet);
     $(document).on('click', '.btn-breed-filter', App.handleBreedFilter);
+    $(document).on('click', '.btn-view-vaccinations', App.handleViewVaccinations);
+    $(document).on('click', '.btn-add-vaccination', App.handleShowVaccinationForm);
+    $(document).on('click', '.btn-save-vaccination', App.handleSaveVaccination);
   },
 
   handleBreedFilter: function(event) {
@@ -184,7 +197,7 @@ App = {
       });
   },
 
-  markAdopted: function(adopters, account) {
+  markAdopted: function() {
     if (!App.contracts.Adoption) {
       return;
     }
@@ -227,7 +240,6 @@ App = {
     var $btn = $(event.target);
     var $panel = $btn.closest('.panel-pet');
     var petId = parseInt($btn.attr('data-id'), 10);
-    var adoptionInstance;
 
     $panel.find('.pet-transfer-error').hide().text('');
 
@@ -246,8 +258,7 @@ App = {
 
       App.contracts.Adoption.deployed()
         .then(function(instance) {
-          adoptionInstance = instance;
-          return adoptionInstance.adopt(petId, { from: account });
+          return instance.adopt(petId, { from: account });
         })
         .then(function(result) {
           return App.markAdopted();
@@ -299,6 +310,189 @@ App = {
             $panel,
             err.message || 'Transfer failed. Only the current owner can transfer this pet.'
           );
+        });
+    });
+  },
+
+  loadVaccinationRecords: async function(petId, petCard) {
+    var historyContainer = petCard.find('.vaccination-history');
+
+    historyContainer.show().html('<p>Loading...</p>');
+
+    try {
+      var adoptionInstance = await App.contracts.Adoption.deployed();
+      var count = await adoptionInstance.getVaccinationCount.call(petId);
+      var vaccinationCount = parseInt(count.toString());
+
+      if (vaccinationCount === 0) {
+        historyContainer.html('<p>No vaccination records found.</p>');
+        return;
+      }
+
+      var records = [];
+
+      for (var i = 0; i < vaccinationCount; i++) {
+        var record = await adoptionInstance.getVaccinationRecord.call(petId, i);
+        records.push({
+          vaccineName: record[0],
+          vaccinationDate: record[1],
+          clinicName: record[2]
+        });
+      }
+
+      records.sort(function(a, b) {
+        return new Date(b.vaccinationDate) - new Date(a.vaccinationDate);
+      });
+
+      var html = '<h4>Vaccination History</h4>';
+
+      for (var j = 0; j < records.length; j++) {
+        var r = records[j];
+        html +=
+          '<div class="well well-sm vaccination-record">' +
+            '<p><strong>' + r.vaccineName + '</strong></p>' +
+            '<p>' + new Date(r.vaccinationDate).toLocaleDateString('en-CA', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric'
+            }) + '</p>' +
+            '<p>' + r.clinicName + '</p>' +
+          '</div>';
+      }
+
+      historyContainer.html(html);
+    } catch (err) {
+      console.log(err.message);
+      historyContainer.html('<p>Error loading vaccination records.</p>');
+    }
+  },
+
+  handleViewVaccinations: async function(event) {
+    event.preventDefault();
+    var button = $(event.currentTarget);
+    var petCard = button.closest('.panel-pet');
+    var historyContainer = petCard.find('.vaccination-history');
+    var petId = parseInt(button.data('id'));
+
+    if (historyContainer.is(':visible') && historyContainer.html().trim() !== '') {
+      historyContainer.hide();
+      button.text('View Records');
+      return;
+    }
+
+    await App.loadVaccinationRecords(petId, petCard);
+    button.text('Hide Records');
+  },
+
+  handleShowVaccinationForm: function(event) {
+    event.preventDefault();
+    var button = $(event.currentTarget);
+    var form = button.closest('.panel-pet').find('.vaccination-form');
+
+    form.toggle();
+
+    if (form.is(':visible')) {
+      button.text('Close');
+    } else {
+      button.text('+ Add Vaccination');
+    }
+  },
+
+  handleSaveVaccination: function(event) {
+    event.preventDefault();
+    var button = $(event.currentTarget);
+    var petCard = button.closest('.panel-pet');
+    var petId = parseInt(button.data('id'));
+    var vaccineName = petCard.find('.vaccine-name').val().trim();
+    var vaccinationDate = petCard.find('.vaccine-date').val();
+    var clinicName = petCard.find('.clinic-name').val().trim();
+    var message = petCard.find('.vaccination-message');
+
+    if (vaccineName === '' || vaccinationDate === '' || clinicName === '') {
+      message
+        .removeClass('alert-success')
+        .addClass('alert alert-danger')
+        .html('Please complete all vaccination fields.')
+        .show();
+      setTimeout(function() { message.fadeOut(); }, 3000);
+      return;
+    }
+
+    var selectedDate = new Date(vaccinationDate);
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    selectedDate.setHours(0, 0, 0, 0);
+
+    if (selectedDate > today) {
+      message
+        .removeClass('alert-success')
+        .addClass('alert alert-danger')
+        .html('Vaccination date cannot be in the future.')
+        .show();
+      setTimeout(function() { message.fadeOut(); }, 3000);
+      return;
+    }
+
+    button.prop('disabled', true).text('Saving...');
+
+    web3.eth.getAccounts(function(error, accounts) {
+      if (error) {
+        button.prop('disabled', false).text('Save Vaccination');
+        return;
+      }
+
+      if (!accounts || accounts.length === 0) {
+        alert('Please connect MetaMask first.');
+        button.prop('disabled', false).text('Save Vaccination');
+        return;
+      }
+
+      var account = accounts[0];
+
+      App.contracts.Adoption.deployed()
+        .then(function(instance) {
+          return instance.addVaccinationRecord(
+            petId,
+            vaccineName,
+            vaccinationDate,
+            clinicName,
+            { from: account }
+          );
+        })
+        .then(async function(result) {
+          message
+            .removeClass('alert-danger')
+            .addClass('alert alert-success')
+            .html('Vaccination record saved successfully.')
+            .show();
+
+          setTimeout(function() { message.fadeOut(); }, 3000);
+
+          petCard.find('.vaccine-name').val('');
+          petCard.find('.vaccine-date').val('');
+          petCard.find('.clinic-name').val('');
+          petCard.find('.vaccination-form').hide();
+          petCard.find('.btn-add-vaccination').text('+ Add Vaccination');
+          button.prop('disabled', false).text('Save Vaccination');
+
+          await App.loadVaccinationRecords(petId, petCard);
+          petCard.find('.btn-view-vaccinations').text('Hide Records');
+        })
+        .catch(function(err) {
+          console.log(err.message);
+          button.prop('disabled', false).text('Save Vaccination');
+
+          var errorMessage = err.message && err.message.includes('User denied')
+            ? 'Transaction cancelled by user.'
+            : 'Could not save vaccination record.';
+
+          message
+            .removeClass('alert-success')
+            .addClass('alert alert-danger')
+            .html(errorMessage)
+            .show();
+
+          setTimeout(function() { message.fadeOut(); }, 4000);
         });
     });
   }
