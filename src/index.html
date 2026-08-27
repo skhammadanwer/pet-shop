@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Pete's Pet Shop</title>
+
+    <!-- Bootstrap -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
+      <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="container">
+      <div class="row">
+        <div class="col-xs-12 col-sm-8 col-sm-push-2">
+          <h1 class="text-center">Pete's Pet Shop</h1>
+          <hr/>
+          <br/>
+        </div>
+      </div>
+
+      <!-- Connect Wallet button row -->
+      <div class="row">
+        <div class="col-xs-12 col-sm-8 col-sm-push-2 text-center">
+          <button
+            id="connectButton"
+            type="button"
+            aria-label="Connect Wallet"
+            class="button_YtCf cta wallet-button_CvpX text-decoration-none primary_nDUu">
+            Connect Wallet
+          </button>
+          <br/><br/>
+        </div>
+      </div>
+
+
+      <!-- Add a pet -->
+      <div class="row">
+        <div class="col-xs-12 col-sm-8 col-sm-push-2">
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <h3 class="panel-title">Add a pet to the shop</h3>
+            </div>
+            <div class="panel-body">
+              <div class="row">
+                <div class="col-sm-6">
+                  <label for="petName">Name</label>
+                  <input type="text" class="form-control" id="petName" placeholder="Aquila">
+                </div>
+                <div class="col-sm-6">
+                  <label for="petBreed">Breed</label>
+                  <input type="text" class="form-control" id="petBreed" placeholder="Bald Eagle">
+                </div>
+              </div>
+              <br/>
+              <div class="row">
+                <div class="col-sm-4">
+                  <label for="petAge">Age</label>
+                  <input type="number" min="0" class="form-control" id="petAge" placeholder="5">
+                </div>
+                <div class="col-sm-8">
+                  <label for="petLocation">Location</label>
+                  <input type="text" class="form-control" id="petLocation" placeholder="Toronto, Ontario">
+                </div>
+              </div>
+              <br/>
+              <div class="row">
+                <div class="col-sm-12">
+                  <label for="petPicture">Image path</label>
+                  <input type="text" class="form-control" id="petPicture" placeholder="images/golden-retriever.jpeg">
+                </div>
+              </div>
+              <br/>
+              <button id="addPetButton" class="btn btn-primary" type="button">Add Pet</button>
+            </div>
+          </div>
+          <br/>
+        </div>
+      </div>
+
+      <div id="petsRow" class="row">
+        <!-- PETS LOAD HERE -->
+      </div>
+    </div>
+
+    <div id="petTemplate" style="display: none;">
+      <div class="col-sm-6 col-md-4 col-lg-3">
+        <div class="panel panel-default panel-pet">
+          <div class="panel-heading">
+            <h3 class="panel-title">Scrappy</h3>
+          </div>
+          <div class="panel-body">
+            <img src="" alt="Pet image">
+            <br/><br/>
+            <strong>Breed</strong>: <span class="pet-breed">Golden Retriever</span><br/>
+            <strong>Age</strong>: <span class="pet-age">3</span><br/>
+            <strong>Location</strong>: <span class="pet-location">Warren, MI</span><br/><br/>
+            <button class="btn btn-default btn-adopt" type="button" data-id="0">Adopt</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+    <!-- Include all compiled plugins (below), or include individual files as needed -->
+    <script src="js/bootstrap.min.js"></script>
+    <script src="js/web3.min.js"></script>
+    <script src="js/truffle-contract.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
