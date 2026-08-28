@@ -1,17 +1,6 @@
 pragma solidity ^0.5.0;
 
 contract Adoption {
-  address public admin;
-
-  constructor() public {
-    admin = msg.sender;
-  }
-
-  modifier onlyAdmin() {
-    require(msg.sender == admin, "Only admin can add vaccination records");
-    _;
-  }
-
   struct Pet {
     string name;
     string breed;
@@ -97,11 +86,11 @@ contract Adoption {
     string memory vaccineName,
     string memory vaccinationDate,
     string memory clinicName
-  )
-    public
-    onlyAdmin
-  {
+  ) public {
     require(petId < pets.length, "Invalid pet ID");
+    require(bytes(vaccineName).length > 0, "Vaccine name required");
+    require(bytes(vaccinationDate).length > 0, "Vaccination date required");
+    require(bytes(clinicName).length > 0, "Clinic name required");
 
     vaccinationRecords[petId].push(
       VaccinationRecord(

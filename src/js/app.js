@@ -130,9 +130,6 @@ App = {
       })
       .then(function() {
         App.drawPetCards(App.getFilteredPets());
-        if (App.currentAccount) {
-          return App.checkAdmin(App.currentAccount);
-        }
       })
       .catch(function(err) {
         console.log(err.message);
@@ -204,7 +201,7 @@ App = {
       petTemplate.find('.btn-adopt').attr('data-id', filtered[i].id).text('Adopt').attr('disabled', false);
       petTemplate.find('.btn-transfer').attr('data-id', filtered[i].id);
       petTemplate.find('.btn-view-vaccinations').attr('data-id', filtered[i].id).text('View Records');
-      petTemplate.find('.btn-add-vaccination').attr('data-id', filtered[i].id).text('+ Add Vaccination').hide();
+      petTemplate.find('.btn-add-vaccination').attr('data-id', filtered[i].id).text('+ Add Vaccination').show();
       petTemplate.find('.btn-save-vaccination').attr('data-id', filtered[i].id);
       petTemplate.find('.vaccination-form').hide();
       petTemplate.find('.vaccination-message').hide().text('');
@@ -283,25 +280,9 @@ App = {
           accounts[0].slice(-4);
       }
 
-      await App.checkAdmin(accounts[0]);
       App.renderPets();
     } catch (error) {
       console.error('Error requesting accounts:', error);
-    }
-  },
-
-  checkAdmin: async function(account) {
-    try {
-      var adoptionInstance = await App.contracts.Adoption.deployed();
-      var admin = await adoptionInstance.admin.call();
-
-      if (account.toLowerCase() === admin.toLowerCase()) {
-        $('.btn-add-vaccination').show();
-      } else {
-        $('.btn-add-vaccination').hide();
-      }
-    } catch (error) {
-      console.error('Error checking admin:', error);
     }
   },
 
