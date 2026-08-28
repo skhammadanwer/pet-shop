@@ -1,7 +1,7 @@
 const Adoption = artifacts.require("Adoption");
 
 contract("Adoption features", function(accounts) {
-  const admin = accounts[0];
+  const deployer = accounts[0];
   const user = accounts[1];
   const other = accounts[2];
   const recipient = accounts[3];
@@ -20,9 +20,9 @@ contract("Adoption features", function(accounts) {
   }
 
   beforeEach(async function() {
-    adoption = await Adoption.new({ from: admin });
-    await addSamplePet(admin, "Frieda");
-    await addSamplePet(admin, "Gina");
+    adoption = await Adoption.new({ from: deployer });
+    await addSamplePet(deployer, "Frieda");
+    await addSamplePet(deployer, "Gina");
   });
 
   it("seeds inventory through addPet and reports pet count", async function() {
@@ -117,20 +117,20 @@ contract("Adoption features", function(accounts) {
     }
   });
 
-  it("lets admin add and read vaccination records", async function() {
+  it("lets any account add and read vaccination records", async function() {
     await adoption.addVaccinationRecord(
       0,
       "Rabies",
       "2025-03-12",
       "Lisco Animal Clinic",
-      { from: admin }
+      { from: user }
     );
     await adoption.addVaccinationRecord(
       0,
       "DHPP",
       "2024-11-04",
       "Lisco Animal Clinic",
-      { from: admin }
+      { from: other }
     );
 
     const count = await adoption.getVaccinationCount(0);
@@ -141,26 +141,20 @@ contract("Adoption features", function(accounts) {
     assert.equal(record.clinicName || record[2], "Lisco Animal Clinic");
   });
 
-  it("blocks non-admin vaccination writes", async function() {
+  it("rejects vaccination records with empty fields", async function() {
     try {
-      await adoption.addVaccinationRecord(
-        0,
-        "Rabies",
-        "2025-03-12",
-        "Lisco Animal Clinic",
-        { from: user }
-      );
-      assert.fail("non-admin vaccination should revert");
+      await adoption.addVaccinationRecord(0, "", "2025-03-12", "Clinic", { from: user });
+      assert.fail("expected empty vaccine name to be rejected");
     } catch (err) {
       assert.ok(
-        err.message.includes("revert") ||
-        err.message.includes("Only admin")
+        /revert|Vaccine name required/i.test(err.message),
+        err.message
       );
     }
   });
 
   it("grows getAdopters with addPet and keeps new pets available", async function() {
-    await addSamplePet(admin, "Scrappy");
+    await addSamplePet(deployer, "Scrappy");
     const adopters = await adoption.getAdopters();
     assert.equal(adopters.length, 3);
     assert.equal(adopters[2], "0x0000000000000000000000000000000000000000");
@@ -180,7 +174,7 @@ contract("Adoption migration seed", function(accounts) {
     const adopters = await adoption.getAdopters();
     assert.equal(adopters[0], accounts[2], "pet 0 should end with accounts[2]");
     assert.equal(adopters[2], accounts[3], "pet 2 should end with accounts[3]");
-    assert.equal(adopters[6], accounts[0], "pet 6 should end with admin");
+    assert.equal(adopters[6], accounts[0], "pet 6 should end with accounts[0]");
 
     const history2 = await adoption.getHistory(2);
     assert.equal(history2[0].length, 3);
