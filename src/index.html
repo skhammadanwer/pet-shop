@@ -39,14 +39,56 @@
       </div>
 
       <div class="row">
+        <div class="col-xs-12 col-sm-8 col-sm-push-2">
+          <div class="panel panel-default">
+            <div class="panel-heading">
+              <h3 class="panel-title">Add a pet to the shop</h3>
+            </div>
+            <div class="panel-body">
+              <div class="row">
+                <div class="col-sm-6">
+                  <label for="petName">Name</label>
+                  <input type="text" class="form-control" id="petName" placeholder="Aquila">
+                </div>
+                <div class="col-sm-6">
+                  <label for="petBreed">Breed</label>
+                  <input type="text" class="form-control" id="petBreed" placeholder="Bald Eagle">
+                </div>
+              </div>
+              <br/>
+              <div class="row">
+                <div class="col-sm-4">
+                  <label for="petAge">Age</label>
+                  <input type="number" min="0" class="form-control" id="petAge" placeholder="5">
+                </div>
+                <div class="col-sm-8">
+                  <label for="petLocation">Location</label>
+                  <input type="text" class="form-control" id="petLocation" placeholder="Toronto, Ontario">
+                </div>
+              </div>
+              <br/>
+              <div class="row">
+                <div class="col-sm-12">
+                  <label for="petPicture">Image path</label>
+                  <input type="text" class="form-control" id="petPicture" placeholder="images/eagle.JPG">
+                </div>
+              </div>
+              <br/>
+              <button id="addPetButton" class="btn btn-primary" type="button">Add Pet</button>
+              <p id="addPetMessage" class="text-muted" style="margin-top: 8px; display: none;"></p>
+            </div>
+          </div>
+          <br/>
+        </div>
+      </div>
+
+      <div class="row">
         <div class="col-xs-12 text-center">
           <p><strong>Filter by breed</strong></p>
-          <button type="button" class="btn btn-primary btn-breed-filter" data-breed="all" style="margin: 0 4px 8px;">All (16)</button>
-          <button type="button" class="btn btn-default btn-breed-filter" data-breed="Scottish Terrier" style="margin: 0 4px 8px;">Scottish Terrier (3)</button>
-          <button type="button" class="btn btn-default btn-breed-filter" data-breed="French Bulldog" style="margin: 0 4px 8px;">French Bulldog (5)</button>
-          <button type="button" class="btn btn-default btn-breed-filter" data-breed="Boxer" style="margin: 0 4px 8px;">Boxer (3)</button>
-          <button type="button" class="btn btn-default btn-breed-filter" data-breed="Golden Retriever" style="margin: 0 4px 8px;">Golden Retriever (5)</button>
-          <p id="filterCount" class="text-muted" style="margin-top: 10px;">Showing 16 pets</p>
+          <div id="breedFilters">
+            <button type="button" class="btn btn-primary btn-breed-filter" data-breed="all" style="margin: 0 4px 8px;">All</button>
+          </div>
+          <p id="filterCount" class="text-muted" style="margin-top: 10px;">Showing 0 pets</p>
           <br/>
           <p><strong>Filter by status</strong></p>
           <button type="button" class="btn btn-primary btn-status-filter" data-status="all" style="margin: 0 4px 8px;">All</button>
@@ -95,12 +137,10 @@
               data-id="0">
               View Records
             </button>
-            <!-- Add style="display: none;" below data-id="0" when finish all the code  -->
             <button
               class="btn btn-success btn-add-vaccination"
               type="button"
-              data-id="0"
-              >
+              data-id="0">
               + Add Vaccination
             </button>
             <br><br>
