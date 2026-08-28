@@ -18,6 +18,8 @@ contract Adoption {
   event PetAdded(uint petId, string name);
   event Transferred(uint petId, address from, address to, uint timestamp);
 
+  uint public returnFee = 0.01 ether;
+
   struct VaccinationRecord {
     string vaccineName;
     string vaccinationDate;
@@ -70,6 +72,19 @@ contract Adoption {
     historyTimes[petId].push(now);
 
     emit Transferred(petId, previous, newOwner, now);
+  }
+
+  function returnPet(uint petId) public payable {
+    require(petId < pets.length, "Invalid pet ID");
+    require(adopters[petId] == msg.sender, "You are not the adopter");
+    require(msg.value == returnFee, "Incorrect return fee");
+
+    address previous = adopters[petId];
+    adopters[petId] = address(0);
+    historyOwners[petId].push(address(0));
+    historyTimes[petId].push(now);
+
+    emit Transferred(petId, previous, address(0), now);
   }
 
   function getAdopters() public view returns (address[] memory) {

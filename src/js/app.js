@@ -199,6 +199,7 @@ App = {
       petTemplate.find('.pet-transfer-address').val('');
       petTemplate.find('.pet-transfer-error').hide().text('');
       petTemplate.find('.btn-adopt').attr('data-id', filtered[i].id).text('Adopt').attr('disabled', false);
+      petTemplate.find('.btn-return').attr('data-id', filtered[i].id).text('Return Pet (0.01 ETH)').attr('disabled', true);
       petTemplate.find('.btn-transfer').attr('data-id', filtered[i].id);
       petTemplate.find('.btn-view-vaccinations').attr('data-id', filtered[i].id).text('View Records');
       petTemplate.find('.btn-add-vaccination').attr('data-id', filtered[i].id).text('+ Add Vaccination').show();
@@ -299,6 +300,7 @@ App = {
 
   bindEvents: function() {
     $(document).on('click', '.btn-adopt', App.handleAdopt);
+    $(document).on('click', '.btn-return', App.handleReturn);
     $(document).on('click', '.btn-transfer', App.handleTransfer);
     $(document).on('click', '#connectButton', App.connectWallet);
     $(document).on('click', '#addPetButton', App.handleAddPet);
@@ -455,25 +457,44 @@ App = {
     App.contracts.Adoption.deployed()
       .then(function(instance) {
         adoptionInstance = instance;
-        return adoptionInstance.getAdopters.call();
+        return Promise.all([
+          adoptionInstance.getAdopters.call(),
+          adoptionInstance.returnFee.call()
+        ]);
       })
-      .then(function(adopters) {
+      .then(function(results) {
+        var adopters = results[0];
+        var fee = results[1];
         App.adopters = adopters;
+
+        var feeEth = (web3.utils && web3.utils.fromWei)
+          ? web3.utils.fromWei(fee, 'ether')
+          : web3.fromWei(fee, 'ether');
 
         $('.panel-pet').each(function() {
           var $panel = $(this);
           var petId = parseInt($panel.find('.btn-adopt').attr('data-id'), 10);
           var owner = adopters[petId];
           var isOwned = owner && owner !== App.emptyAddress;
+          var isCurrentOwner = isOwned && App.currentAccount &&
+            owner.toLowerCase() === App.currentAccount;
+          var $returnBtn = $panel.find('.btn-return');
 
           $panel.find('.pet-owner').text(
             isOwned ? App.truncateAddress(owner) : 'Available'
           );
 
-          if (isOwned) {
+          $returnBtn.text('Return Pet (' + feeEth + ' ETH)');
+
+          if (isCurrentOwner) {
             $panel.find('.btn-adopt').text('Success').attr('disabled', true);
+            $returnBtn.attr('disabled', false);
+          } else if (isOwned) {
+            $panel.find('.btn-adopt').text('Success').attr('disabled', true);
+            $returnBtn.attr('disabled', true);
           } else {
             $panel.find('.btn-adopt').text('Adopt').attr('disabled', false);
+            $returnBtn.attr('disabled', true);
           }
 
           App.loadHistory(adoptionInstance, $panel, petId);
@@ -515,6 +536,49 @@ App = {
         })
         .catch(function(err) {
           App.showPanelError($panel, err.message || 'Adoption failed.');
+        });
+    });
+  },
+
+  handleReturn: function(event) {
+    event.preventDefault();
+
+    var $btn = $(event.target);
+    var $panel = $btn.closest('.panel-pet');
+    var petId = parseInt($btn.attr('data-id'), 10);
+
+    $panel.find('.pet-transfer-error').hide().text('');
+
+    web3.eth.getAccounts(function(error, accounts) {
+      if (error) {
+        App.showPanelError($panel, error.message || 'Could not read wallet accounts.');
+        return;
+      }
+
+      if (!accounts || accounts.length === 0) {
+        App.showPanelError($panel, 'No accounts available. Make sure MetaMask is connected.');
+        return;
+      }
+
+      var account = accounts[0];
+
+      App.contracts.Adoption.deployed()
+        .then(function(instance) {
+          return instance.returnFee.call().then(function(fee) {
+            return instance.returnPet(petId, {
+              from: account,
+              value: fee
+            });
+          });
+        })
+        .then(function() {
+          return App.renderPets();
+        })
+        .catch(function(err) {
+          App.showPanelError(
+            $panel,
+            err.message || 'Return failed. Only the current owner can return this pet, and the fee must match.'
+          );
         });
     });
   },
