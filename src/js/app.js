@@ -10,11 +10,6 @@ App = {
   emptyAddress: '0x0000000000000000000000000000000000000000',
 
   init: async function() {
-    $.getJSON('../pets.json', function(data) {
-      App.pets = data;
-      App.renderPets();
-    });
-
     return await App.initWeb3();
   },
 
@@ -38,11 +33,90 @@ App = {
     return /^0x[0-9a-fA-F]{40}$/.test(value);
   },
 
+  loadPets: function() {
+    if (!App.contracts.Adoption) {
+      return Promise.resolve();
+    }
+
+    var adoptionInstance;
+
+    return App.contracts.Adoption.deployed()
+      .then(function(instance) {
+        adoptionInstance = instance;
+        return adoptionInstance.getPetCount.call();
+      })
+      .then(function(count) {
+        var total = count.toNumber ? count.toNumber() : Number(count);
+        var requests = [];
+
+        for (var i = 0; i < total; i++) {
+          requests.push(adoptionInstance.pets.call(i));
+        }
+
+        return Promise.all(requests);
+      })
+      .then(function(pets) {
+        App.pets = pets.map(function(pet, index) {
+          var age = pet[2];
+          if (age && typeof age.toNumber === 'function') {
+            age = age.toNumber();
+          }
+
+          return {
+            id: index,
+            name: pet[0],
+            breed: pet[1],
+            age: age,
+            location: pet[3],
+            picture: pet[4]
+          };
+        });
+
+        App.renderBreedFilters();
+        return App.renderPets();
+      })
+      .catch(function(err) {
+        console.log(err.message);
+      });
+  },
+
+  renderBreedFilters: function() {
+    var counts = {};
+    for (var i = 0; i < App.pets.length; i++) {
+      var breed = App.pets[i].breed || 'Unknown';
+      counts[breed] = (counts[breed] || 0) + 1;
+    }
+
+    if (App.selectedBreed !== 'all' && !counts[App.selectedBreed]) {
+      App.selectedBreed = 'all';
+    }
+
+    var $container = $('#breedFilters');
+    $container.empty();
+
+    var breeds = Object.keys(counts).sort();
+    var buttons = [{ breed: 'all', label: 'All (' + App.pets.length + ')' }].concat(
+      breeds.map(function(breed) {
+        return { breed: breed, label: breed + ' (' + counts[breed] + ')' };
+      })
+    );
+
+    for (var j = 0; j < buttons.length; j++) {
+      var isSelected = buttons[j].breed === App.selectedBreed;
+      var btnClass = isSelected ? 'btn btn-primary' : 'btn btn-default';
+      $container.append(
+        '<button type="button" class="' + btnClass + ' btn-breed-filter" data-breed="' +
+          buttons[j].breed +
+          '" style="margin: 0 4px 8px;">' +
+          buttons[j].label +
+        '</button>'
+      );
+    }
+  },
+
   renderPets: function() {
     if (!App.contracts.Adoption) {
-      App.drawPetCards(App.pets.filter(function(pet) {
-        return App.selectedBreed === 'all' || pet.breed === App.selectedBreed;
-      }));
+      App.drawPetCards(App.getFilteredPets());
       return;
     }
 
@@ -56,6 +130,9 @@ App = {
       })
       .then(function() {
         App.drawPetCards(App.getFilteredPets());
+        if (App.currentAccount) {
+          return App.checkAdmin(App.currentAccount);
+        }
       })
       .catch(function(err) {
         console.log(err.message);
@@ -233,7 +310,7 @@ App = {
       var AdoptionArtifact = data;
       App.contracts.Adoption = TruffleContract(AdoptionArtifact);
       App.contracts.Adoption.setProvider(App.web3Provider);
-      return App.renderPets();
+      return App.loadPets();
     });
 
     return App.bindEvents();
@@ -243,6 +320,7 @@ App = {
     $(document).on('click', '.btn-adopt', App.handleAdopt);
     $(document).on('click', '.btn-transfer', App.handleTransfer);
     $(document).on('click', '#connectButton', App.connectWallet);
+    $(document).on('click', '#addPetButton', App.handleAddPet);
     $(document).on('click', '.btn-breed-filter', App.handleBreedFilter);
     $(document).on('click', '.btn-status-filter', App.handleStatusFilter);
     $(document).on('click', '#myPetsToggle', App.handleMyPetsToggle);
@@ -286,6 +364,72 @@ App = {
 
     App.showMyPetsOnly = !App.showMyPetsOnly;
     App.renderPets();
+  },
+
+  showAddPetMessage: function(message, isError) {
+    var $message = $('#addPetMessage');
+    $message
+      .toggleClass('text-danger', !!isError)
+      .toggleClass('text-muted', !isError)
+      .text(message)
+      .show();
+  },
+
+  handleAddPet: function(event) {
+    event.preventDefault();
+
+    var name = $('#petName').val().trim();
+    var breed = $('#petBreed').val().trim();
+    var age = parseInt($('#petAge').val(), 10);
+    var location = $('#petLocation').val().trim();
+    var picture = $('#petPicture').val().trim();
+    var button = $('#addPetButton');
+
+    if (!name) {
+      App.showAddPetMessage('Give the pet a name.', true);
+      return;
+    }
+
+    if (isNaN(age) || age < 0) {
+      age = 0;
+    }
+
+    if (!picture) {
+      picture = 'images/eagle.JPG';
+    }
+
+    web3.eth.getAccounts(function(error, accounts) {
+      if (error) {
+        App.showAddPetMessage(error.message || 'Could not read wallet accounts.', true);
+        return;
+      }
+
+      if (!accounts || accounts.length === 0) {
+        App.showAddPetMessage('Connect your wallet first.', true);
+        return;
+      }
+
+      var account = accounts[0];
+
+      button.text('Adding...').attr('disabled', true);
+      App.showAddPetMessage('Submitting transaction...', false);
+
+      App.contracts.Adoption.deployed()
+        .then(function(instance) {
+          return instance.addPet(name, breed, age, location, picture, { from: account });
+        })
+        .then(function() {
+          $('#petName, #petBreed, #petAge, #petLocation, #petPicture').val('');
+          App.showAddPetMessage('Pet added to the shop.', false);
+          return App.loadPets();
+        })
+        .catch(function(err) {
+          App.showAddPetMessage(err.message || 'Could not add pet.', true);
+        })
+        .then(function() {
+          button.text('Add Pet').attr('disabled', false);
+        });
+    });
   },
 
   showPanelError: function($panel, message) {

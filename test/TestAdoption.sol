@@ -11,6 +11,11 @@ contract TestAdoption {
   address expectedAdopter = address(this);
   address expectedNewOwner = address(0x123);
 
+  function testShopIsSeeded() public {
+    uint count = adoption.getPetCount();
+    Assert.isAtLeast(count, 16, "Shop should be seeded with the pets from pets.json");
+  }
+
   function testUserCanAdoptPet() public {
     uint returnedId = adoption.adopt(expectedPetId);
     Assert.equal(returnedId, expectedPetId, "Adoption of the expected pet should match what is returned.");
@@ -22,7 +27,7 @@ contract TestAdoption {
   }
 
   function testGetAdopterAddressByPetIdInArray() public {
-    address[16] memory adopters = adoption.getAdopters();
+    address[] memory adopters = adoption.getAdopters();
     Assert.equal(adopters[expectedPetId], expectedAdopter, "Owner of the expected pet should be this contract");
   }
 
@@ -41,5 +46,19 @@ contract TestAdoption {
     Assert.equal(timestamps.length, 2, "History should include two timestamps");
     Assert.equal(owners[0], expectedAdopter, "First owner should be this contract");
     Assert.equal(owners[1], expectedNewOwner, "Second owner should be the transfer recipient");
+  }
+
+  function testUserCanAddPet() public {
+    uint countBefore = adoption.getPetCount();
+    uint newPetId = adoption.addPet(
+      "Aquila",
+      "Bald Eagle",
+      5,
+      "Toronto, Ontario",
+      "images/eagle.JPG"
+    );
+
+    Assert.equal(newPetId, countBefore, "New pet should take the next free id.");
+    Assert.equal(adoption.getPetCount(), countBefore + 1, "Pet count should grow by one.");
   }
 }

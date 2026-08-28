@@ -12,12 +12,21 @@ contract Adoption {
     _;
   }
 
-  address[16] public adopters;
-  uint public petCount = 16;
+  struct Pet {
+    string name;
+    string breed;
+    uint age;
+    string location;
+    string picture;
+  }
+
+  Pet[] public pets;
+  address[] public adopters;
 
   mapping(uint => address[]) private historyOwners;
   mapping(uint => uint[]) private historyTimes;
 
+  event PetAdded(uint petId, string name);
   event Transferred(uint petId, address from, address to, uint timestamp);
 
   struct VaccinationRecord {
@@ -28,8 +37,29 @@ contract Adoption {
 
   mapping(uint => VaccinationRecord[]) private vaccinationRecords;
 
+  function addPet(
+    string memory name,
+    string memory breed,
+    uint age,
+    string memory location,
+    string memory picture
+  ) public returns (uint) {
+    require(bytes(name).length > 0, "Pet needs a name");
+
+    pets.push(Pet(name, breed, age, location, picture));
+    adopters.push(address(0));
+
+    uint petId = pets.length - 1;
+    emit PetAdded(petId, name);
+    return petId;
+  }
+
+  function getPetCount() public view returns (uint) {
+    return pets.length;
+  }
+
   function adopt(uint petId) public returns (uint) {
-    require(petId < petCount, "Invalid pet ID");
+    require(petId < pets.length, "Invalid pet ID");
     require(adopters[petId] == address(0));
 
     adopters[petId] = msg.sender;
@@ -41,7 +71,7 @@ contract Adoption {
   }
 
   function transfer(uint petId, address newOwner) public {
-    require(petId < petCount, "Invalid pet ID");
+    require(petId < pets.length, "Invalid pet ID");
     require(adopters[petId] == msg.sender);
     require(newOwner != address(0));
 
@@ -53,12 +83,12 @@ contract Adoption {
     emit Transferred(petId, previous, newOwner, now);
   }
 
-  function getAdopters() public view returns (address[16] memory) {
+  function getAdopters() public view returns (address[] memory) {
     return adopters;
   }
 
   function getHistory(uint petId) public view returns (address[] memory, uint[] memory) {
-    require(petId < petCount, "Invalid pet ID");
+    require(petId < pets.length, "Invalid pet ID");
     return (historyOwners[petId], historyTimes[petId]);
   }
 
@@ -71,7 +101,7 @@ contract Adoption {
     public
     onlyAdmin
   {
-    require(petId < petCount, "Invalid pet ID");
+    require(petId < pets.length, "Invalid pet ID");
 
     vaccinationRecords[petId].push(
       VaccinationRecord(
@@ -87,7 +117,7 @@ contract Adoption {
     view
     returns (uint)
   {
-    require(petId < petCount, "Invalid pet ID");
+    require(petId < pets.length, "Invalid pet ID");
     return vaccinationRecords[petId].length;
   }
 
@@ -103,7 +133,7 @@ contract Adoption {
       string memory clinicName
     )
   {
-    require(petId < petCount, "Invalid pet ID");
+    require(petId < pets.length, "Invalid pet ID");
     require(
       recordIndex < vaccinationRecords[petId].length,
       "Invalid vaccination record"
