@@ -27,6 +27,10 @@ Push the branch and open a pull request. After it is merged, everyone else shoul
 
 To push branches to this repo (not only fork), ask to be added as a collaborator with Write access.
 
+## How to run
+
+Step-by-step setup (Ganache, migrate --reset, MetaMask) is in [HOW_TO_RUN.txt](HOW_TO_RUN.txt). Do not share Ganache database files; recreate demo state locally with `truffle migrate --reset`.
+
 ## Installation
 
 1. Install Truffle globally.

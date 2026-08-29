@@ -1,0 +1,113 @@
+HOW TO RUN PETE'S PET SHOP
+==========================
+
+Do not copy or commit a Ganache database. The repo stores contracts and
+the migration/seed script. Each person recreates the same demo chain
+locally with migrate --reset.
+
+
+1. INSTALL TOOLS (once)
+-----------------------
+
+You need:
+
+  - Node.js and npm
+  - Ganache (desktop app is fine)
+  - Truffle
+        npm install -g truffle
+    Or use npx truffle in the commands below.
+  - MetaMask in Chrome or Firefox
+
+
+2. GET THE CODE
+---------------
+
+  git clone https://github.com/skhammadanwer/pet-shop.git
+  cd pet-shop
+  git checkout main
+  git pull
+  npm install
+
+
+3. START GANACHE
+----------------
+
+  1. Open Ganache.
+  2. Create a NEW workspace (do not import someone else's chain folder).
+  3. Set the RPC server to 127.0.0.1 port 7545.
+  4. Leave it running.
+
+Truffle is configured for port 7545 in truffle-config.js.
+
+
+4. COMPILE AND SEED THE CHAIN
+-----------------------------
+
+From the project folder, with Ganache running:
+
+  truffle compile
+  truffle migrate --reset --network development
+
+This deploys the Adoption contract and seeds demo data from
+migrations/2_deploy_contracts.js and src/pets.json:
+
+  - 16 pets
+  - Sample adopts/transfers on pets 0, 2, and 6
+  - Sample vaccination records on those pets
+
+If migrate fails, confirm Ganache is on 7545, then run migrate --reset
+again.
+
+
+5. START THE APP
+----------------
+
+  npm run dev
+
+Open:
+
+  http://localhost:3000
+
+
+6. CONNECT METAMASK
+-------------------
+
+  1. Add a network: Localhost 7545
+     RPC URL:    http://127.0.0.1:7545
+     Chain ID:   match Ganache (often 5777 or 1337)
+     Currency:   ETH
+  2. Import one or more accounts from YOUR Ganache workspace
+     (Settings -> Accounts -> the private key).
+     Do not use someone else's keys from a screenshot or chat.
+  3. In the shop, click Connect Wallet and approve MetaMask.
+
+Addresses differ on every new Ganache workspace. That is expected.
+The seed script uses accounts[0], [1], [2], [3] on YOUR chain, so the
+same pets are owned in the same way even if the hex addresses change.
+
+
+7. AFTER YOU PULL NEW CODE
+--------------------------
+
+If contracts or migrations changed:
+
+  git checkout main
+  git pull
+  truffle migrate --reset --network development
+
+Then refresh http://localhost:3000.
+
+If MetaMask errors about nonce or the chain changed, reset the account
+(Settings -> Advanced -> Reset account) or re-import the Ganache key.
+
+
+8. WHAT NOT TO PUT ON GITHUB
+----------------------------
+
+  - Ganache workspace / chaindata / saved blockchain folders
+  - Private keys or mnemonics
+  - build/  (already gitignored; created by truffle compile)
+
+Clicks you make in the UI (extra adopts, new pets) stay on your local
+chain only. They disappear on the next migrate --reset. That is
+intentional. Shared demo data always comes from the seed migration.
